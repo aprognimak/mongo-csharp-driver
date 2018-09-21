@@ -15,6 +15,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -25,11 +26,16 @@ using MongoDB.Driver.Core.Misc;
 
 namespace MongoDB.Driver.Linq
 {
+    internal interface IHasStages
+    {
+        IEnumerable<BsonDocument> Stages { get; }
+    }
+
     /// <summary>
     /// A model for a queryable to be executed using the aggregation framework.
     /// </summary>
     /// <typeparam name="TOutput">The type of the output.</typeparam>
-    public sealed class AggregateQueryableExecutionModel<TOutput> : QueryableExecutionModel
+    public sealed class AggregateQueryableExecutionModel<TOutput> : QueryableExecutionModel, IHasStages
     {
         private readonly IReadOnlyList<BsonDocument> _stages;
         private readonly IBsonSerializer<TOutput> _outputSerializer;
@@ -84,7 +90,7 @@ namespace MongoDB.Driver.Linq
         internal override object Execute<TInput>(IMongoCollection<TInput> collection, AggregateOptions options)
         {
             var pipeline = CreatePipeline<TInput>();
-
+            Trace.WriteLine(this);
             return collection.Aggregate(pipeline, options, CancellationToken.None);
         }
 

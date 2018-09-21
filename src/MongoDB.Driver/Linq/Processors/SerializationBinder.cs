@@ -267,9 +267,10 @@ namespace MongoDB.Driver.Linq.Processors
             var oldIsInEmbeddedPipeline = _isInEmbeddedPipeline;
             _isInEmbeddedPipeline = true;
 
-            node = node.Update(
-                Visit(node.Object),
-                Visit(node.Arguments));
+            var nodeObject = Visit(node.Object);
+            var nodeArguments = Visit(node.Arguments);
+
+            node = node.Update(nodeObject, nodeArguments);
 
             _isInEmbeddedPipeline = oldIsInEmbeddedPipeline;
             if (_isInEmbeddedPipeline)

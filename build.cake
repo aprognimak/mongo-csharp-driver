@@ -54,7 +54,6 @@ Task("BuildNet45")
     .Does(() =>
     {
         NuGetRestore(solutionFile);
-        GlobalAssemblyInfo.OverwriteGlobalAssemblyInfoFile(Context, solutionDirectory, configuration, gitVersion);
         DotNetBuild(solutionFile, settings => settings
             .SetConfiguration(configuration)
             .SetVerbosity(Verbosity.Minimal)
@@ -84,7 +83,6 @@ Task("BuildNet45")
     })
     .Finally(() =>
     {
-        GlobalAssemblyInfo.RestoreGlobalAssemblyInfoFile(Context, solutionDirectory);
     });
 
 Task("BuildNetStandard15")
@@ -97,7 +95,6 @@ Task("BuildNetStandard15")
         {
             DotNetCoreRestore(directory.ToString());
         }
-        GlobalAssemblyInfo.OverwriteGlobalAssemblyInfoFile(Context, solutionDirectory, configuration, gitVersion);
         var settings= new DotNetCoreBuildSettings { Configuration = configuration };
         foreach (var directory in dotNetProjectDirectories) 
         {
@@ -119,7 +116,6 @@ Task("BuildNetStandard15")
     })
     .Finally(() =>
     {
-        GlobalAssemblyInfo.RestoreGlobalAssemblyInfoFile(Context, solutionDirectory);
     });
 
 Task("Test")
@@ -348,7 +344,7 @@ Task("PackageNugetPackages")
         EnsureDirectoryExists(artifactsPackagesDirectory);
         CleanDirectory(artifactsPackagesDirectory);
 
-        var packageVersion = gitVersion.NuGetVersion;
+        string packageVersion = "9.7.2";
 
         var nuspecFiles = GetFiles("./Build/*.nuspec");
         foreach (var nuspecFile in nuspecFiles)

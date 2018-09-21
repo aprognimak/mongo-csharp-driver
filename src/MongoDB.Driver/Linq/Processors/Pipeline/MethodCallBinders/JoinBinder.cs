@@ -40,7 +40,7 @@ namespace MongoDB.Driver.Linq.Processors.Pipeline.MethodCallBinders
         public Expression Bind(PipelineExpression pipeline, PipelineBindingContext bindingContext, MethodCallExpression node, IEnumerable<Expression> arguments)
         {
             var args = arguments.ToList();
-            var joined = bindingContext.Bind(args[0]) as CollectionExpression;
+            var joined = bindingContext.Bind(args[0]) as SerializationExpression;
             if (joined == null)
             {
                 throw new NotSupportedException("The joined collection cannot have any qualifiers.");

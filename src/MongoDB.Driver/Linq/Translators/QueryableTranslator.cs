@@ -28,6 +28,17 @@ using MongoDB.Driver.Support;
 
 namespace MongoDB.Driver.Linq.Translators
 {
+    internal class RootCollectionFinder : ExtensionExpressionVisitor
+    {
+        internal CollectionExpression CollectionExpression { get; set; }
+
+        protected internal override Expression VisitCollection(CollectionExpression node)
+        {
+            CollectionExpression = CollectionExpression ?? node;
+            return node;
+        }
+    }
+
     internal sealed class QueryableTranslator
     {
         public static QueryableTranslation Translate(Expression node, IBsonSerializerRegistry serializerRegistry, ExpressionTranslationOptions translationOptions)
@@ -137,7 +148,10 @@ namespace MongoDB.Driver.Linq.Translators
             Translate(node.Source);
 
             var projection = TranslateProjectValue(node.Selector);
-            _stages.Add(new BsonDocument("$group", projection));
+            if (projection!=null)
+            {
+                _stages.Add(new BsonDocument("$group", projection));
+            }
         }
 
         private void TranslateGroupJoin(GroupJoinExpression node)
@@ -179,10 +193,12 @@ namespace MongoDB.Driver.Linq.Translators
         {
             Translate(node.Source);
 
-            var joined = node.Joined as CollectionExpression;
-            if (joined == null)
+            var joinedCollection = node.Joined as CollectionExpression;
+            var joinedPipeline = node.Joined as PipelineExpression;
+
+            if (joinedCollection == null && joinedPipeline == null)
             {
-                throw new NotSupportedException("Only a collection is allowed to be joined.");
+                throw new NotSupportedException("Only a collection or a pipeline is allowed to be joined.");
             }
 
             var localFieldValue = AggregateLanguageTranslator.Translate(node.SourceKeySelector, _translationOptions);
@@ -201,13 +217,52 @@ namespace MongoDB.Driver.Linq.Translators
 
             var foreignField = foreignFieldValue.ToString().Substring(1); // remove '$'
 
-            _stages.Add(new BsonDocument("$lookup", new BsonDocument
+            if (joinedPipeline != null)
             {
-                { "from", ((CollectionExpression)node.Joined).CollectionNamespace.CollectionName },
-                { "localField", localField },
-                { "foreignField", foreignField },
-                { "as", node.JoinedItemName }
-            }));
+                var joinedPipelineTranslation =
+                    QueryableTranslator.Translate(joinedPipeline, _serializerRegistry, _translationOptions);
+
+                var pipelineStages = new List<BsonDocument>();
+
+                var translatedAggregateModel = joinedPipelineTranslation.Model as IHasStages;
+                if (translatedAggregateModel?.Stages != null)
+                {
+                    pipelineStages.AddRange(translatedAggregateModel.Stages);
+                }
+
+                var localFieldAliasName = $"root_{localField}";
+
+                var letFields = new BsonDocument(localFieldAliasName, $"${localField}");
+
+                var pipelineKeyExpression =
+                    new BsonArray(new String[] { $"${foreignField}", $"$${localFieldAliasName}" });
+                var pipelineKeyEquals = new BsonDocument("$eq", pipelineKeyExpression);
+                var pipelineKeyExpr = new BsonDocument("$expr", pipelineKeyEquals);
+                var pipelineMatchJoin = new BsonDocument("$match", pipelineKeyExpr);
+                pipelineStages.Add(pipelineMatchJoin);
+
+                var rootCollectionFinder = new RootCollectionFinder();
+                rootCollectionFinder.Visit(joinedPipeline.Source);
+                var pipelineRoot = rootCollectionFinder.CollectionExpression;
+
+                _stages.Add(new BsonDocument("$lookup", new BsonDocument
+                {
+                    { "from", pipelineRoot.CollectionNamespace.CollectionName },
+                    { "let", letFields },
+                    { "pipeline", new BsonArray(pipelineStages) },
+                    { "as", node.JoinedItemName }
+                }));
+            }
+            else
+            {
+                _stages.Add(new BsonDocument("$lookup", new BsonDocument
+                {
+                    { "from", ((CollectionExpression)node.Joined).CollectionNamespace.CollectionName },
+                    { "localField", localField },
+                    { "foreignField", foreignField },
+                    { "as", node.JoinedItemName }
+                }));
+            }
 
             _stages.Add(new BsonDocument("$unwind", "$" + node.JoinedItemName));
         }
@@ -293,7 +348,11 @@ namespace MongoDB.Driver.Linq.Translators
             Translate(node.Source);
 
             var projectValue = TranslateProjectValue(node.Selector);
-            _stages.Add(new BsonDocument("$project", projectValue));
+            if (projectValue!=null)
+            {
+                _stages.Add(new BsonDocument("$project", projectValue));
+            }
+
         }
 
         private void TranslateSelectMany(SelectManyExpression node)
@@ -341,7 +400,10 @@ namespace MongoDB.Driver.Linq.Translators
             _stages.Add(new BsonDocument("$unwind", unwindValue));
 
             var projectValue = TranslateProjectValue(node.ResultSelector);
-            _stages.Add(new BsonDocument("$project", projectValue));
+            if (projectValue!=null)
+            {
+                _stages.Add(new BsonDocument("$project", projectValue));
+            }
         }
 
         private void TranslateSkip(SkipExpression node)
@@ -369,24 +431,35 @@ namespace MongoDB.Driver.Linq.Translators
         private BsonDocument TranslateProjectValue(Expression selector)
         {
             BsonDocument projectValue;
-            var result = AggregateLanguageTranslator.Translate(selector, _translationOptions);
-            if (result.BsonType == BsonType.String)
-            {
-                // this means we got back a field expression prefixed with a $ sign.
-                projectValue = new BsonDocument(result.ToString().Substring(1), 1);
-            }
-            else if (result.BsonType == BsonType.Document)
-            {
-                projectValue = (BsonDocument)result;
-            }
-            else
-            {
-                throw new NotSupportedException($"The expression {selector.ToString()} is not supported.");
-            }
 
-            if (!projectValue.Contains("_id"))
+            try
             {
-                projectValue.Add("_id", 0);
+
+                var result = AggregateLanguageTranslator.Translate(selector, _translationOptions);
+
+                if (result.BsonType == BsonType.String)
+                {
+                    // this means we got back a field expression prefixed with a $ sign.
+                    projectValue = new BsonDocument(result.ToString().Substring(1), 1);
+                }
+                else if (result.BsonType == BsonType.Document)
+                {
+                    projectValue = (BsonDocument)result;
+                }
+                else
+                {
+                    throw new NotSupportedException($"The expression {selector.ToString()} is not supported.");
+                }
+
+                if (!projectValue.Contains("_id"))
+                {
+                    projectValue.Add("_id", 0);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                return null;
             }
 
             return projectValue;

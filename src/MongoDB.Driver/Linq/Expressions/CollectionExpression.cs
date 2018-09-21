@@ -15,6 +15,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Serializers;
@@ -26,11 +27,13 @@ namespace MongoDB.Driver.Linq.Expressions
     {
         private readonly CollectionNamespace _collectionNamespace;
         private readonly IBsonSerializer _serializer;
+        private readonly Type _expressionType;
 
         public CollectionExpression(CollectionNamespace collectionNamespace, IBsonSerializer itemSerializer)
         {
             _collectionNamespace = Ensure.IsNotNull(collectionNamespace, nameof(collectionNamespace));
             _serializer = SerializerHelper.CreateEnumerableSerializer(Ensure.IsNotNull(itemSerializer, nameof(itemSerializer)));
+            _expressionType = typeof(IQueryable<>).MakeGenericType(itemSerializer.ValueType);
         }
 
         public override ExtensionExpressionType ExtensionType
@@ -50,7 +53,7 @@ namespace MongoDB.Driver.Linq.Expressions
 
         public override Type Type
         {
-            get { return _serializer.ValueType; }
+            get { return _expressionType; }
         }
 
         public override string ToString()

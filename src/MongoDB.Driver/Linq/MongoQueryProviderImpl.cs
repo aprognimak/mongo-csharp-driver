@@ -14,6 +14,7 @@
 */
 
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -81,6 +82,7 @@ namespace MongoDB.Driver.Linq
             var lambda = Expression.Lambda(executionPlan);
             try
             {
+                Trace.WriteLine(lambda);
                 return lambda.Compile().DynamicInvoke(null);
             }
             catch (TargetInvocationException tie)

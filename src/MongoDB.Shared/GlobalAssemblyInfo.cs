@@ -15,9 +15,9 @@
 
 using System.Reflection;
 
-[assembly: AssemblyCompany("MongoDB Inc.")]
-[assembly: AssemblyVersion("0.0.0.*")]
-[assembly: AssemblyFileVersion("0.0.0.0")]
+[assembly: AssemblyCompany("Alexey")]
+[assembly: AssemblyVersion("9.7.1.*")]
+[assembly: AssemblyFileVersion("9.7.1.0")]
 [assembly: AssemblyInformationalVersion("0.0.0-unofficial")]
 [assembly: AssemblyCopyright("Copyright © 2010-present MongoDB Inc.")]
 [assembly: AssemblyConfiguration("Debug")]

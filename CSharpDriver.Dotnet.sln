@@ -37,6 +37,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MongoDB.Driver.GridFS.Dotne
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MongoDB.Driver.GridFS.Tests.Dotnet", "tests\MongoDB.Driver.GridFS.Tests.Dotnet\MongoDB.Driver.GridFS.Tests.Dotnet.csproj", "{7E266FA4-DD26-4462-A4A6-FD50BA4CCF4C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Playground", "Playground\Playground.csproj", "{B94B0397-F4BA-4741-8D47-BA484B1EB88E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -99,6 +101,10 @@ Global
 		{7E266FA4-DD26-4462-A4A6-FD50BA4CCF4C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7E266FA4-DD26-4462-A4A6-FD50BA4CCF4C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7E266FA4-DD26-4462-A4A6-FD50BA4CCF4C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B94B0397-F4BA-4741-8D47-BA484B1EB88E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B94B0397-F4BA-4741-8D47-BA484B1EB88E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B94B0397-F4BA-4741-8D47-BA484B1EB88E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B94B0397-F4BA-4741-8D47-BA484B1EB88E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
