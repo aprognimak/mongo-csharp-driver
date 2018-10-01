@@ -65,5 +65,7 @@ namespace Ownable.Entities
         [DisplayName("Category")]
         public EntityKeyType ProductCategoryId { get; set; }
         public virtual ProductCategory ProductCategory { get; set; }
+
+        public Dictionary<string, object> ExtraElements { get; set; }
     }
 }

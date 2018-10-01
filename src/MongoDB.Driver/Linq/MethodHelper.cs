@@ -90,11 +90,12 @@ namespace MongoDB.Driver.Linq
 
             var declaringTypeDefinition = methodInfo.DeclaringType.GetGenericTypeDefinition();
 #if NETSTANDARD1_5 || NETSTANDARD1_6
-            var bindingFlags = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public;
+            var bindingFlags = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
             var parameterTypes = methodInfo.GetParameters().Select(p => p.ParameterType).ToArray();
-            return declaringTypeDefinition.GetTypeInfo().GetMethods(bindingFlags)
-                .Where(m => m.Name == methodInfo.Name && m.GetParameters().Count() == parameterTypes.Length) // TODO: need better matching
-                .Single();
+            var methods = declaringTypeDefinition.GetTypeInfo().GetMethods(bindingFlags).ToList();
+            var filteredMethods = methods.Where(m =>
+                m.Name == methodInfo.Name && m.GetParameters().Count() == parameterTypes.Length).ToList(); // TODO: need better matching
+            return filteredMethods.Single();
 #else
             return (MethodInfo)MethodBase.GetMethodFromHandle(methodInfo.MethodHandle, declaringTypeDefinition.TypeHandle);
 #endif

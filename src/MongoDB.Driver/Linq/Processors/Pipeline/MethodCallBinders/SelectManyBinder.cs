@@ -57,25 +57,55 @@ namespace MongoDB.Driver.Linq.Processors.Pipeline.MethodCallBinders
             }
 
             string resultItemName;
-            Expression resultSelector;
+            Expression resultSelector = pipeline.Projector;
+            SerializationExpression projector = pipeline.Projector;
+
             if (arguments.Count() == 2)
             {
                 var resultLambda = ExpressionHelper.GetLambda(arguments.Last());
                 bindingContext.AddExpressionMapping(resultLambda.Parameters[0], pipeline.Projector);
-                bindingContext.AddExpressionMapping(
-                    resultLambda.Parameters[1],
-                    new FieldExpression(collectionField.FieldName, itemSerializationInfo.Serializer));
+                bindingContext.AddExpressionMapping(resultLambda.Parameters[1], new FieldExpression(collectionField.FieldName, itemSerializationInfo.Serializer));
 
+                if (resultLambda.Body is MemberInitExpression)
+                {
+                    var memberInit = resultLambda.Body as MemberInitExpression;
+                    var memberInitAssignments = memberInit.Bindings.Cast<MemberAssignment>().ToList();
+                    var sourceMemberAssignment = memberInitAssignments[0];
+                    var joinedMemberAssignment = memberInitAssignments[1];
+
+                    var resultSelectorTypeInfo = resultLambda.ReturnType.GetTypeInfo();
+                    var constructorWithMembers = resultSelectorTypeInfo.GetConstructor(new Type[]
+                        {sourceMemberAssignment.Member.GetType(), joinedMemberAssignment.Member.GetType()});
+
+                    var propOrFieldSource = resultSelectorTypeInfo.GetMember(sourceMemberAssignment.Member.Name,
+                        BindingFlags.GetField | BindingFlags.GetProperty | BindingFlags.IgnoreCase | BindingFlags.NonPublic | BindingFlags.Public |
+                        BindingFlags.Instance).FirstOrDefault();
+
+                    var propOrFieldJoined = resultSelectorTypeInfo.GetMember(joinedMemberAssignment.Member.Name,
+                        BindingFlags.GetField | BindingFlags.GetProperty | BindingFlags.IgnoreCase | BindingFlags.NonPublic | BindingFlags.Public |
+                        BindingFlags.Instance).FirstOrDefault();
+
+                    bindingContext.AddMemberMapping(propOrFieldSource, pipeline.Projector);
+                    bindingContext.AddMemberMapping(propOrFieldJoined, new FieldExpression(collectionField.FieldName, itemSerializationInfo.Serializer));
+                }
+                
                 resultItemName = resultLambda.Parameters[1].Name;
-                resultSelector = bindingContext.Bind(resultLambda.Body);
+
+                if (!(resultLambda.Body is MethodCallExpression))
+                {
+                    resultSelector = bindingContext.Bind(resultLambda.Body);
+                    projector = bindingContext.BindProjector(ref resultSelector);
+                }
+                else
+                {
+                    projector = new MethodCallProjectionExpression(pipeline.Projector.Serializer, resultLambda);
+                }
             }
             else
             {
                 resultItemName = "__p";
                 resultSelector = new FieldExpression(collectionField.FieldName, itemSerializationInfo.Serializer);
             }
-
-            var projector = bindingContext.BindProjector(ref resultSelector);
 
             return new PipelineExpression(
                 new SelectManyExpression(

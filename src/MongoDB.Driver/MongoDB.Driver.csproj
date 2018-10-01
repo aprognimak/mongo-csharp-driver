@@ -139,6 +139,7 @@
     <Compile Include="Linq\Expressions\ExtensionExpressionType.cs" />
     <Compile Include="Linq\Expressions\ExtensionExpressionVisitor.cs" />
     <Compile Include="Linq\Expressions\ArrayIndexExpression.cs" />
+	<Compile Include="Linq\Expressions\MethodCallProjectionExpression.cs" />
     <Compile Include="Linq\Expressions\FieldExpression.cs" />
     <Compile Include="Linq\Expressions\GroupByWithResultSelectorExpression.cs" />
     <Compile Include="Linq\Expressions\GroupingKeyExpression.cs" />
@@ -279,6 +280,7 @@
     <Compile Include="Linq\Processors\Transformers\VBInformationIsNothingTransformer.cs" />
     <Compile Include="Linq\Processors\Transformers\VBNothingConversionRemovalTransformer.cs" />
     <Compile Include="Linq\Processors\Transformers\VBStringIndexComparisonTransformer.cs" />
+	<Compile Include="Linq\Processors\Transformers\LambdaParametersNormalizingTransformer.cs" />
     <Compile Include="Linq\QueryableExecutionModel.cs" />
     <Compile Include="Linq\SerializerHelper.cs" />
     <Compile Include="Linq\Translators\AggregateExpressionTranslator.cs" />

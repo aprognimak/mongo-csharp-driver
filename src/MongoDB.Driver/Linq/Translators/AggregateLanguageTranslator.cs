@@ -150,8 +150,8 @@ namespace MongoDB.Driver.Linq.Translators
                     break;
             }
 
-            var message = string.Format("$project or $group does not support {0}.",
-                node.ToString());
+            var message = string.Format("$project or $group does not support {0} {1}.",
+                node.ToString(), node.Type);
             throw new NotSupportedException(message);
         }
 
@@ -564,7 +564,8 @@ namespace MongoDB.Driver.Linq.Translators
                 TryTranslateMaxResultOperator(node, out result) ||
                 TryTranslateMinResultOperator(node, out result) ||
                 TryTranslateStdDevResultOperator(node, out result) ||
-                TryTranslateSumResultOperator(node, out result))
+                TryTranslateSumResultOperator(node, out result) ||
+                TryTranslateToListResultOperator(node, out result))
             {
                 if (result == null)
                 {
@@ -824,6 +825,23 @@ namespace MongoDB.Driver.Linq.Translators
                         return true;
                     }
                     break;
+                case "AddMinutes":
+                    if (node.Arguments.Count == 1)
+                    {
+                        var numberMinutes = TranslateValue(node.Arguments[0]);
+                        var multiply = new BsonDocument("$multiply", new BsonArray()
+                        {
+                            numberMinutes, 60000
+                        });
+
+                        result = new BsonDocument("$add", new BsonArray
+                        {
+                           field, multiply
+                        });
+
+                        return true;
+                    }
+                    break;
             }
 
             return false;
@@ -929,6 +947,19 @@ namespace MongoDB.Driver.Linq.Translators
                     return true;
             }
 
+            return false;
+        }
+
+        private bool TryTranslateToListResultOperator(PipelineExpression node, out BsonValue result)
+        {
+            var resultOperator = node.ResultOperator as ListResultOperator;
+            if (resultOperator != null)
+            {
+                result = null;
+                return true;
+            }
+
+            result = null;
             return false;
         }
 

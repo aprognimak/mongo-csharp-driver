@@ -410,7 +410,19 @@ namespace MongoDB.Driver.Linq.Translators
                 return query;
             }
 
-            return TranslateComparison(variableExpression, operatorType, constantExpression);
+            query = TranslateComparison(variableExpression, operatorType, constantExpression);
+            if (query != null)
+            {
+                return query;
+            }
+
+            var exprExpression =
+                AggregateLanguageTranslator.Translate(binaryExpression, ExpressionTranslationOptions.Default);
+
+            var comparisonDocument = new BsonDocument("$expr", exprExpression);
+            FilterDefinition<BsonDocument> exprDefinition = comparisonDocument;
+
+            return exprDefinition;
         }
 
         private FilterDefinition<BsonDocument> TranslateCompareTo(Expression variableExpression, ExpressionType operatorType, ConstantExpression constantExpression)
@@ -438,31 +450,41 @@ namespace MongoDB.Driver.Linq.Translators
         private FilterDefinition<BsonDocument> TranslateComparison(Expression variableExpression, ExpressionType operatorType, ConstantExpression constantExpression)
         {
             var value = constantExpression.Value;
+            FilterDefinition<BsonDocument> variableFilterDefinition = null;
 
             var methodCallExpression = variableExpression as MethodCallExpression;
-            if (methodCallExpression != null && value is bool)
+            if (methodCallExpression != null)
             {
-                var boolValue = (bool)value;
-                var query = this.TranslateMethodCall(methodCallExpression);
+                if (value is bool)
+                {
+                    var boolValue = (bool) value;
+                    variableFilterDefinition = this.TranslateMethodCall(methodCallExpression);
 
-                var isTrueComparison = (boolValue && operatorType == ExpressionType.Equal)
-                                        || (!boolValue && operatorType == ExpressionType.NotEqual);
+                    var isTrueComparison = (boolValue && operatorType == ExpressionType.Equal)
+                                           || (!boolValue && operatorType == ExpressionType.NotEqual);
 
-                return isTrueComparison ? query : __builder.Not(query);
+                    return isTrueComparison ? variableFilterDefinition : __builder.Not(variableFilterDefinition);
+                }
+                else
+                {
+                    return null;
+                }
             }
-
+            
             var fieldExpression = GetFieldExpression(variableExpression);
-
-            var valueSerializer = FieldValueSerializerHelper.GetSerializerForValueType(fieldExpression.Serializer, _serializerRegistry, constantExpression.Type, value);
+            var valueSerializer = FieldValueSerializerHelper.GetSerializerForValueType(fieldExpression.Serializer,
+                _serializerRegistry, constantExpression.Type, value);
             var serializedValue = valueSerializer.ToBsonValue(value);
 
             switch (operatorType)
             {
                 case ExpressionType.Equal: return __builder.Eq(fieldExpression.FieldName, serializedValue);
                 case ExpressionType.GreaterThan: return __builder.Gt(fieldExpression.FieldName, serializedValue);
-                case ExpressionType.GreaterThanOrEqual: return __builder.Gte(fieldExpression.FieldName, serializedValue);
+                case ExpressionType.GreaterThanOrEqual:
+                    return __builder.Gte(fieldExpression.FieldName, serializedValue);
                 case ExpressionType.LessThan: return __builder.Lt(fieldExpression.FieldName, serializedValue);
-                case ExpressionType.LessThanOrEqual: return __builder.Lte(fieldExpression.FieldName, serializedValue);
+                case ExpressionType.LessThanOrEqual:
+                    return __builder.Lte(fieldExpression.FieldName, serializedValue);
                 case ExpressionType.NotEqual: return __builder.Ne(fieldExpression.FieldName, serializedValue);
             }
 

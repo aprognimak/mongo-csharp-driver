@@ -25,6 +25,7 @@ namespace MongoDB.Driver.Linq.Processors
         static Transformer()
         {
             __registry = new ExpressionTransformerRegistry();
+            __registry.Register(new LambdaParametersNormalizingTransformer());
             __registry.Register(new NullableTransformer());
             __registry.Register(new EqualsAnyBooleanTransformer());
             __registry.Register(new FirstLastNormalizingTransformer());

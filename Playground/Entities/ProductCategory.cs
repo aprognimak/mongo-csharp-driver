@@ -31,5 +31,7 @@ namespace Ownable.Entities
         [InverseProperty("Parent")]
         public virtual ICollection<ProductCategory> ChildCategories { get; set; }
         public virtual ICollection<Product> Products { get; set; }
+
+        public Dictionary<string, object> ExtraElements { get; set; }
     }
 }

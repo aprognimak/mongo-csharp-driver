@@ -148,7 +148,7 @@ namespace MongoDB.Driver.Linq.Translators
             Translate(node.Source);
 
             var projection = TranslateProjectValue(node.Selector);
-            if (projection!=null)
+            if (projection != null)
             {
                 _stages.Add(new BsonDocument("$group", projection));
             }
@@ -158,10 +158,12 @@ namespace MongoDB.Driver.Linq.Translators
         {
             Translate(node.Source);
 
-            var joined = node.Joined as CollectionExpression;
-            if (joined == null)
+            var joinedCollection = node.Joined as CollectionExpression;
+            var joinedPipeline = node.Joined as PipelineExpression;
+
+            if (joinedCollection == null && joinedPipeline == null)
             {
-                throw new NotSupportedException("Only a collection is allowed to be joined.");
+                throw new NotSupportedException("Only a collection or a pipeline is allowed to be joined.");
             }
 
             var localFieldValue = AggregateLanguageTranslator.Translate(node.SourceKeySelector, _translationOptions);
@@ -180,13 +182,20 @@ namespace MongoDB.Driver.Linq.Translators
 
             var foreignField = foreignFieldValue.ToString().Substring(1); // remove '$'
 
-            _stages.Add(new BsonDocument("$lookup", new BsonDocument
+            if (joinedPipeline != null)
             {
-                { "from", ((CollectionExpression)node.Joined).CollectionNamespace.CollectionName },
-                { "localField", localField },
-                { "foreignField", foreignField },
-                { "as", node.JoinedItemName }
-            }));
+                TranslateJoinedPipeline(joinedPipeline, node.JoinedItemName, localField, foreignField);
+            }
+            else
+            {
+                _stages.Add(new BsonDocument("$lookup", new BsonDocument
+                {
+                    { "from", ((CollectionExpression)node.Joined).CollectionNamespace.CollectionName },
+                    { "localField", localField },
+                    { "foreignField", foreignField },
+                    { "as", node.JoinedItemName }
+                }));
+            }
         }
 
         private void TranslateJoin(JoinExpression node)
@@ -219,39 +228,7 @@ namespace MongoDB.Driver.Linq.Translators
 
             if (joinedPipeline != null)
             {
-                var joinedPipelineTranslation =
-                    QueryableTranslator.Translate(joinedPipeline, _serializerRegistry, _translationOptions);
-
-                var pipelineStages = new List<BsonDocument>();
-
-                var translatedAggregateModel = joinedPipelineTranslation.Model as IHasStages;
-                if (translatedAggregateModel?.Stages != null)
-                {
-                    pipelineStages.AddRange(translatedAggregateModel.Stages);
-                }
-
-                var localFieldAliasName = $"root_{localField}";
-
-                var letFields = new BsonDocument(localFieldAliasName, $"${localField}");
-
-                var pipelineKeyExpression =
-                    new BsonArray(new String[] { $"${foreignField}", $"$${localFieldAliasName}" });
-                var pipelineKeyEquals = new BsonDocument("$eq", pipelineKeyExpression);
-                var pipelineKeyExpr = new BsonDocument("$expr", pipelineKeyEquals);
-                var pipelineMatchJoin = new BsonDocument("$match", pipelineKeyExpr);
-                pipelineStages.Add(pipelineMatchJoin);
-
-                var rootCollectionFinder = new RootCollectionFinder();
-                rootCollectionFinder.Visit(joinedPipeline.Source);
-                var pipelineRoot = rootCollectionFinder.CollectionExpression;
-
-                _stages.Add(new BsonDocument("$lookup", new BsonDocument
-                {
-                    { "from", pipelineRoot.CollectionNamespace.CollectionName },
-                    { "let", letFields },
-                    { "pipeline", new BsonArray(pipelineStages) },
-                    { "as", node.JoinedItemName }
-                }));
+                TranslateJoinedPipeline(joinedPipeline, node.JoinedItemName, localField, foreignField);
             }
             else
             {
@@ -265,6 +242,43 @@ namespace MongoDB.Driver.Linq.Translators
             }
 
             _stages.Add(new BsonDocument("$unwind", "$" + node.JoinedItemName));
+        }
+
+        private void TranslateJoinedPipeline(PipelineExpression joinedPipeline, string joinedItemName, string localField, string foreignField)
+        {
+            var joinedPipelineTranslation =
+                QueryableTranslator.Translate(joinedPipeline, _serializerRegistry, _translationOptions);
+
+            var pipelineStages = new List<BsonDocument>();
+
+            var translatedAggregateModel = joinedPipelineTranslation.Model as IHasStages;
+            if (translatedAggregateModel?.Stages != null)
+            {
+                pipelineStages.AddRange(translatedAggregateModel.Stages);
+            }
+
+            var localFieldAliasName = $"root_{localField}";
+
+            var letFields = new BsonDocument(localFieldAliasName, $"${localField}");
+
+            var pipelineKeyExpression =
+                new BsonArray(new String[] {$"${foreignField}", $"$${localFieldAliasName}"});
+            var pipelineKeyEquals = new BsonDocument("$eq", pipelineKeyExpression);
+            var pipelineKeyExpr = new BsonDocument("$expr", pipelineKeyEquals);
+            var pipelineMatchJoin = new BsonDocument("$match", pipelineKeyExpr);
+            pipelineStages.Add(pipelineMatchJoin);
+
+            var rootCollectionFinder = new RootCollectionFinder();
+            rootCollectionFinder.Visit(joinedPipeline.Source);
+            var pipelineRoot = rootCollectionFinder.CollectionExpression;
+
+            _stages.Add(new BsonDocument("$lookup", new BsonDocument
+            {
+                {"from", pipelineRoot.CollectionNamespace.CollectionName},
+                {"let", letFields},
+                {"pipeline", new BsonArray(pipelineStages)},
+                {"as", joinedItemName}
+            }));
         }
 
         private void TranslateOrderBy(OrderByExpression node)
@@ -299,6 +313,7 @@ namespace MongoDB.Driver.Linq.Translators
 
             var serializationExpression = node.Projector as ISerializationExpression;
             var fieldExpression = node.Projector as FieldExpression; // not IFieldExpression
+
             if (fieldExpression != null)
             {
                 var info = new BsonSerializationInfo(fieldExpression.FieldName, fieldExpression.Serializer, fieldExpression.Serializer.ValueType);
@@ -348,7 +363,7 @@ namespace MongoDB.Driver.Linq.Translators
             Translate(node.Source);
 
             var projectValue = TranslateProjectValue(node.Selector);
-            if (projectValue!=null)
+            if (projectValue != null)
             {
                 _stages.Add(new BsonDocument("$project", projectValue));
             }
@@ -400,7 +415,7 @@ namespace MongoDB.Driver.Linq.Translators
             _stages.Add(new BsonDocument("$unwind", unwindValue));
 
             var projectValue = TranslateProjectValue(node.ResultSelector);
-            if (projectValue!=null)
+            if (projectValue != null)
             {
                 _stages.Add(new BsonDocument("$project", projectValue));
             }
@@ -434,7 +449,6 @@ namespace MongoDB.Driver.Linq.Translators
 
             try
             {
-
                 var result = AggregateLanguageTranslator.Translate(selector, _translationOptions);
 
                 if (result.BsonType == BsonType.String)
@@ -448,7 +462,7 @@ namespace MongoDB.Driver.Linq.Translators
                 }
                 else
                 {
-                    throw new NotSupportedException($"The expression {selector.ToString()} is not supported.");
+                    return null;
                 }
 
                 if (!projectValue.Contains("_id"))
@@ -456,7 +470,7 @@ namespace MongoDB.Driver.Linq.Translators
                     projectValue.Add("_id", 0);
                 }
             }
-            catch (Exception e)
+            catch (NotSupportedException e)
             {
                 Console.WriteLine(e);
                 return null;

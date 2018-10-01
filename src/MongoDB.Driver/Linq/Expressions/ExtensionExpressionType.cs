@@ -54,5 +54,7 @@ namespace MongoDB.Driver.Linq.Expressions
 
         // Temporary
         Correlated,
+
+        MethodCallProjection
     }
 }

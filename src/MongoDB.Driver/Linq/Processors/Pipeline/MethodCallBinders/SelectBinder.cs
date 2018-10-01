@@ -19,6 +19,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using MongoDB.Driver.Linq.Expressions;
+using MongoDB.Driver.Linq.Expressions.ResultOperators;
 
 namespace MongoDB.Driver.Linq.Processors.Pipeline.MethodCallBinders
 {
@@ -35,21 +36,37 @@ namespace MongoDB.Driver.Linq.Processors.Pipeline.MethodCallBinders
             var lambda = ExpressionHelper.GetLambda(arguments.Single());
             bindingContext.AddExpressionMapping(lambda.Parameters[0], pipeline.Projector);
 
-            var selector = bindingContext.Bind(lambda.Body);
-
-            if (selector == pipeline.Projector)
+            if (!(lambda.Body is MethodCallExpression))
             {
-                return pipeline;
+                var selector = bindingContext.Bind(lambda.Body);
+
+                if (selector == pipeline.Projector)
+                {
+                    return pipeline;
+                }
+
+                var projector = bindingContext.BindProjector(ref selector);
+
+                return new PipelineExpression(
+                    new SelectExpression(
+                        pipeline.Source,
+                        lambda.Parameters[0].Name,
+                        selector),
+                    projector);
             }
+            else
+            {
+                var methodCallProjector = new MethodCallProjectionExpression(pipeline.Projector.Serializer, lambda);
 
-            var projector = bindingContext.BindProjector(ref selector);
+                var newPipeline = new PipelineExpression(
+                    new SelectExpression(
+                        pipeline.Source,
+                        lambda.Parameters[0].Name,
+                        pipeline.Projector),
+                    methodCallProjector);
 
-            return new PipelineExpression(
-                new SelectExpression(
-                    pipeline.Source,
-                    lambda.Parameters[0].Name,
-                    selector),
-                projector);
+                return newPipeline;
+            }
         }
     }
 }

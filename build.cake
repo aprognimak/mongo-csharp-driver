@@ -344,7 +344,7 @@ Task("PackageNugetPackages")
         EnsureDirectoryExists(artifactsPackagesDirectory);
         CleanDirectory(artifactsPackagesDirectory);
 
-        string packageVersion = "9.7.2";
+        string packageVersion = "9.7.30";
 
         var nuspecFiles = GetFiles("./Build/*.nuspec");
         foreach (var nuspecFile in nuspecFiles)

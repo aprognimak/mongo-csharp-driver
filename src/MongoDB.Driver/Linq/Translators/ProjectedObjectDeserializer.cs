@@ -70,6 +70,11 @@ namespace MongoDB.Driver.Linq.Translators
                 {
                     array.Add(ReadArray(context, currentKey));
                 }
+                else if (bsonType == BsonType.String)
+                {
+                    var fff = bsonReader.ReadString();
+                    array.Add(fff);
+                }
                 else
                 {
                     // we should never get here because we, presumably, have only pulled back things we know about...

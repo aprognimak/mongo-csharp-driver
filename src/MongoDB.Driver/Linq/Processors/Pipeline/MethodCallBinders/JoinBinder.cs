@@ -66,7 +66,12 @@ namespace MongoDB.Driver.Linq.Processors.Pipeline.MethodCallBinders
             var joinedKeySelectorLambda = ExpressionHelper.GetLambda(args[2]);
             var joinedDocument = new DocumentExpression(joinedItemSerializationInfo.Serializer);
             bindingContext.AddExpressionMapping(joinedKeySelectorLambda.Parameters[0], joinedDocument);
-            var joinedKeySelector = bindingContext.Bind(joinedKeySelectorLambda.Body) as IFieldExpression;
+            var joinedKeySelector = bindingContext.Bind(joinedKeySelectorLambda.Body);
+            if (joinedKeySelector.NodeType == ExpressionType.Convert)
+            {
+                //Hack?
+                joinedKeySelector = (joinedKeySelector as UnaryExpression).Operand;
+            }
 
             if (joinedKeySelector == null)
             {
@@ -116,8 +121,14 @@ namespace MongoDB.Driver.Linq.Processors.Pipeline.MethodCallBinders
             }
 
             SerializationExpression projector;
+            var memberInitResultSelector = resultSelector as MemberInitExpression;
+            var memberInitAssignments = memberInitResultSelector?.Bindings.Cast<MemberAssignment>().ToList();
+
             var newResultSelector = resultSelector as NewExpression;
+            var methodCallResultSelector = resultSelector as MethodCallExpression;
+            
             if (newResultSelector != null &&
+                newResultSelector.Arguments.Count == 2 &&
                 newResultSelector.Arguments[0] == sourceDocument &&
                 newResultSelector.Arguments[1] == joinedField)
             {
@@ -129,6 +140,102 @@ namespace MongoDB.Driver.Linq.Processors.Pipeline.MethodCallBinders
                     joinedSerializer,
                     newResultSelector.Members[1].Name,
                     resultSelectorLambda.Parameters[1].Name,
+                    creator);
+
+                projector = new DocumentExpression(serializer);
+            }
+            else if (memberInitResultSelector != null && 
+                     memberInitAssignments.Count==2 && 
+                     memberInitAssignments[0].Expression == sourceDocument &&
+                     memberInitAssignments[1].Expression == joinedField)
+            {
+                var sourceMemberAssignment = memberInitAssignments[0];
+                var joinedMemberAssignment = memberInitAssignments[1];
+
+                var resultSelectorTypeInfo = resultSelector.Type.GetTypeInfo();
+                var constructorWithMembers = resultSelectorTypeInfo.GetConstructor(new Type[]
+                    {sourceMemberAssignment.Member.GetType(), joinedMemberAssignment.Member.GetType()});
+
+                var propOrFieldSource = resultSelectorTypeInfo.GetMember(sourceMemberAssignment.Member.Name,
+                    BindingFlags.GetField | BindingFlags.GetProperty | BindingFlags.IgnoreCase | BindingFlags.NonPublic | BindingFlags.Public |
+                    BindingFlags.Instance).FirstOrDefault();
+
+                var propOrFieldJoined = resultSelectorTypeInfo.GetMember(joinedMemberAssignment.Member.Name,
+                    BindingFlags.GetField | BindingFlags.GetProperty | BindingFlags.IgnoreCase | BindingFlags.NonPublic | BindingFlags.Public |
+                    BindingFlags.Instance).FirstOrDefault();
+
+                bindingContext.AddMemberMapping(propOrFieldSource, sourceDocument);
+                bindingContext.AddMemberMapping(propOrFieldJoined, joinedField);
+
+                Func<object, object, object> creator = (s, j) =>
+                {
+                    if (constructorWithMembers != null)
+                    {
+                        var o = Activator.CreateInstance(resultSelector.Type, s, j);
+                        return o;
+                    }
+                    else
+                    {
+                        var o = Activator.CreateInstance(resultSelector.Type);
+
+                        var propInfoSource = propOrFieldSource as PropertyInfo;
+                        propInfoSource?.SetValue(o, s);
+
+                        var propInfoJoined = propOrFieldJoined as PropertyInfo;
+                        propInfoJoined?.SetValue(o, j);
+
+                        var fieldInfoSource = propOrFieldSource as FieldInfo;
+                        fieldInfoSource?.SetValue(o, s);
+
+                        var fieldInfoJoined = propOrFieldJoined as FieldInfo;
+                        fieldInfoJoined?.SetValue(o, j);
+
+                        return o;
+                    }
+                };
+
+                var serializer = (IBsonSerializer)Activator.CreateInstance(
+                    typeof(JoinSerializer<>).MakeGenericType(resultSelector.Type),
+                    sourceSerializer,
+                    memberInitAssignments[0].Member.Name,
+                    joinedSerializer,
+                    memberInitAssignments[1].Member.Name,
+                    resultSelectorLambda.Parameters[1].Name,
+                    creator);
+                
+                projector = new DocumentExpression(serializer);
+            }
+            else if (methodCallResultSelector != null)
+            {
+                var sourceArgument = resultSelectorLambda.Parameters[0];
+                var joinedArgument = resultSelectorLambda.Parameters[1];
+
+                var resultTypeInfo = resultSelectorLambda.ReturnType.GetTypeInfo();
+                var resultTypeInfoProps = resultTypeInfo.GetProperties().Cast<MemberInfo>().ToList();
+                if (!resultTypeInfoProps.Any())
+                {
+                    resultTypeInfoProps = resultTypeInfo.GetFields().Cast<MemberInfo>().ToList();
+                }
+                var sourceMemberInfo = resultTypeInfoProps[0];
+                var joinedMemberInfo = resultTypeInfoProps[1];
+
+                bindingContext.AddMemberMapping(sourceMemberInfo, sourceDocument);
+                bindingContext.AddMemberMapping(joinedMemberInfo, joinedField);
+
+                var methodCallCompiled = resultSelectorLambda.Compile();
+
+                Func<object, object, object> creator = (s, j) =>
+                    {
+                        return methodCallCompiled.DynamicInvoke(s, j);
+                    };
+
+                var serializer = (IBsonSerializer)Activator.CreateInstance(
+                    typeof(JoinSerializer<>).MakeGenericType(resultSelector.Type),
+                    sourceSerializer,
+                    sourceArgument.Name,
+                    joinedSerializer,
+                    joinedArgument.Name,
+                    resultSelectorLambda.Parameters[1].Name, 
                     creator);
 
                 projector = new DocumentExpression(serializer);

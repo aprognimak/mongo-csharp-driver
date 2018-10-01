@@ -100,9 +100,13 @@ namespace MongoDB.Driver.Linq.Processors
         private void VisitNew(NewExpression node)
         {
             _constructor = node.Constructor;
+            if (_constructor == null)
+            {
+                return;
+            }
 
             var type = node.Type;
-            foreach (var parameter in node.Constructor.GetParameters())
+            foreach (var parameter in _constructor.GetParameters())
             {
                 MemberInfo member;
                 if (node.Members != null)

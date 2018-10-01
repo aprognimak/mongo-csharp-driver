@@ -75,9 +75,16 @@ namespace MongoDB.Driver.Linq.Processors
                 return subtree;
             }
 
-            Expression<Func<object>> lambda = Expression.Lambda<Func<object>>(Expression.Convert(subtree, typeof(object)));
-            var compiledLambda = lambda.Compile();
-            return Expression.Constant(compiledLambda(), subtree.Type);
+            try
+            {
+                Expression<Func<object>> lambda = Expression.Lambda<Func<object>>(Expression.Convert(subtree, typeof(object)));
+                var compiledLambda = lambda.Compile();
+                return Expression.Constant(compiledLambda(), subtree.Type);
+            }
+            catch (Exception)
+            {
+                return subtree;
+            }
         }
 
         private class Nominator : ExpressionVisitor
@@ -116,6 +123,13 @@ namespace MongoDB.Driver.Linq.Processors
 
                 _isBlocked |= _oldIsBlocked;
                 return visited;
+            }
+
+            protected override Expression VisitBlock(BlockExpression node)
+            {
+                _isBlocked = true;
+
+                return node;
             }
 
             protected override Expression VisitListInit(ListInitExpression node)

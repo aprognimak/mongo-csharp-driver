@@ -101,7 +101,7 @@
               "_id": 0
             },
             "$returnKey": false,
-            "$showDiskLoc": false,
+            "$showDiskLoc": false
           }
         }
       },
@@ -132,7 +132,7 @@
                 "_id": 0
               },
               "returnKey": false,
-              "showRecordId": false,
+              "showRecordId": false
             },
             "command_name": "find",
             "database_name": "command-monitoring-tests"

@@ -19,6 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="..\MongoDB.Driver\Linq\Processors\Transformers\NullConditionalTransformer.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\MongoDB.Bson.Dotnet\MongoDB.Bson.Dotnet.csproj" />
     <ProjectReference Include="..\MongoDB.Driver.Core.Dotnet\MongoDB.Driver.Core.Dotnet.csproj" />
   </ItemGroup>
