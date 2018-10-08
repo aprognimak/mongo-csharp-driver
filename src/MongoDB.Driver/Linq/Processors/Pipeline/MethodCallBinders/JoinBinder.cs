@@ -48,7 +48,13 @@ namespace MongoDB.Driver.Linq.Processors.Pipeline.MethodCallBinders
 
             var sourceKeySelectorLambda = ExpressionHelper.GetLambda(args[1]);
             bindingContext.AddExpressionMapping(sourceKeySelectorLambda.Parameters[0], pipeline.Projector);
-            var sourceKeySelector = bindingContext.Bind(sourceKeySelectorLambda.Body) as IFieldExpression;
+            var sourceKeySelector = bindingContext.Bind(sourceKeySelectorLambda.Body);
+            if (sourceKeySelector.NodeType == ExpressionType.Convert)
+            {
+                //Hack?
+                sourceKeySelector = (sourceKeySelector as UnaryExpression).Operand;
+            }
+
             if (sourceKeySelector == null)
             {
                 var message = string.Format("Unable to determine the serialization information for the outer key selector in the tree: {0}", node.ToString());

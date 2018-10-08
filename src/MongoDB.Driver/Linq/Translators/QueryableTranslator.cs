@@ -258,6 +258,7 @@ namespace MongoDB.Driver.Linq.Translators
             }
 
             var localFieldAliasName = $"root_{localField}";
+            localFieldAliasName = localFieldAliasName.Replace(".", "_");
 
             var letFields = new BsonDocument(localFieldAliasName, $"${localField}");
 

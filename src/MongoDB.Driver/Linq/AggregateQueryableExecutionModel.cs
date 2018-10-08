@@ -81,7 +81,7 @@ namespace MongoDB.Driver.Linq
             var sb = new StringBuilder("aggregate([");
             if (_stages.Count > 0)
             {
-                sb.Append(string.Join(", ", _stages.Select(x => x.ToString())));
+                sb.Append(string.Join(",\n", _stages.Select(x => x.ToString())));
             }
             sb.Append("])");
             return sb.ToString();

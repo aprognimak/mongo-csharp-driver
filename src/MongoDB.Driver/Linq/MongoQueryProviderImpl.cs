@@ -82,7 +82,6 @@ namespace MongoDB.Driver.Linq
             var lambda = Expression.Lambda(executionPlan);
             try
             {
-                Trace.WriteLine(lambda);
                 return lambda.Compile().DynamicInvoke(null);
             }
             catch (TargetInvocationException tie)
